@@ -1,0 +1,75 @@
+https://www.youtube.com/watch?v=72DYDMP09MM
+install instruction
+heroku addons from cmd command prompot
+
+cmd install
+npm install pg
+npm install jsonwebtoken // for this jsonwebtoken
+
+
+git push -u origin master
+
+
+for cmd promt run this for sql query
+https://devcenter.heroku.com/articles/heroku-postgresql
+
+go to the github page
+heroku pg:psql
+
+
+From cmd you can you postgresql
+psql -U foilpncdqpalzt -h ec2-52-20-248-222.compute-1.amazonaws.com
+
+open cmd promt
+Heroku CLI
+heroku pg:psql postgresql-contoured-37288 --app findemeapifinal
+
+
+npm install body-parser
+npm install express mongoose body-parser cors --save
+
+https://findemeapifinal.herokuapp.com/db
+
+start here from mongodb
+…or create a new repository on the command line
+
+echo "# findmenodejsapimongodb" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/manirul26/findmenodejsapimongodb.git
+git push -u origin main
+
+…or push an existing repository from the command line
+
+git remote add origin https://github.com/manirul26/findmenodejsapimongodb.git
+git branch -M main
+git push -u origin main
+
+npm install mongoose --save
+npm install dotenv
+npm install nodeman
+npm install --save node-core
+
+https://www.callicoder.com/node-js-express-mongodb-restful-crud-api-tutorial/
+https://www.youtube.com/watch?v=vjf774RKrLc
+
+
+Node JS api run in different port
+"start": "node index.js" this is orginal
+last time i have added 
+"start": "concurrently \"PORT=3000 nodemon index.js\" \"PORT=3001 react-scripts start\""
+
+
+last update github
+
+…or push an existing repository from the command line
+git remote add origin https://github.com/manirul26/findme23febapimongodb.git
+git branch -M main
+git push -u origin main
+
+
+
+
+
