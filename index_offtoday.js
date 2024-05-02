@@ -30,7 +30,7 @@ require('dotenv/config');
 ////////////////////////
 
 app.use(cors({
-    origin: ['https://examamine.com', 'https://api.examamine.com']
+    origin: ['https://examamine.com', 'https://api.examamine.com', 'https://school.examamine.com','https://demo.examamine.com', 'https://webview.examamine.com', 'http://localhost:3000']
 }));
 
 

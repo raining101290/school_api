@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 
 const SubjectSchema = mongoose.Schema({
-
     parentid: { type: String, required: true },
     schoolcollegename: { type: String },
     name: { type: String },

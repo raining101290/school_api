@@ -25,45 +25,9 @@ require('dotenv/config');
 ////////////////////////
 
 app.use(cors({
-    origin: ['https://school.examamine.com', 'https://webview.examamine.com', 'http://localhost:3000', 'https://schoolapi.examamine.com', 'http://192.168.0.101:3000', 'http://192.168.0.102:3000', 'http://192.168.0.103:3000']
+    origin: ['https://examamine.com', 'https://school.examamine.com','https://demo.examamine.com', 'https://webview.examamine.com', 'http://localhost:3000']
 }));
 
-
-
-// Add headers before the routes are defined
-// app.use(function (req, res, next) {
-
-//     // Website you wish to allow to connect
-//     res.setHeader('Access-Control-Allow-Origin', 'http://localhost:8081');
-
-//     // Request methods you wish to allow
-//     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-
-//     // Request headers you wish to allow
-//     res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
-
-//     // Set to true if you need the website to include cookies in the requests sent
-//     // to the API (e.g. in case you use sessions)
-//     res.setHeader('Access-Control-Allow-Credentials', true);
-
-//     // Pass to next layer of middleware
-//     next();
-// });
-// Access-Control-Allow-Origin
-// var corsOptions = {
-//   origin: 'http://localhost:3000',
-//   optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
-// }
-// app.use(cors(corsOptions));
-// app.use(function(req, res, next) {
-//     res.header("Access-Control-Allow-Origin", "*");
-//     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-//   next();
-// });
-
-
-
-///////////////////////
 
 // import the route here
 const postsRouter = require('./route/route');
@@ -366,16 +330,15 @@ app.use('/updateps', postsRouter)
 //mongoose.connect('mongodb+srv://doadmin:GK9J3724I8s0yQ5z@db-mongodb-sgp1-20694-1c299fa2.mongo.ondigitalocean.com/admin?retryWrites=true&w=majority') // live
 // mongoose.connect('mongodb://127.0.0.1:27017/examdb') // localhost my pc
 
- mongoose.connect(process.env.DATABASE_URL) // localhost my pc
+ mongoose.connect(process.env.DATABASE_URL, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  useFindAndModify: false // Add this line to disable the findAndModify deprecation warning
+}) // localhost my pc
 .then(() => console.log('connection successfully'))
 .catch(err => console.log(err))
 
 
-// FORMAT OF TOKEN
-// Authorization: Bearer <access_token>
-//https://www.youtube.com/watch?v=7nafaH9SddU
-// react native token tutorial https://www.youtube.com/watch?v=JbuP5vRjz8o
-// Verify Token
 function verifyToken(req, res, next) {
   // Get auth header value
   const bearerHeader = req.headers['authorization'];

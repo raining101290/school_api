@@ -5,6 +5,7 @@ const ExamSchema = mongoose.Schema({
     examname: { type: String, required: true },
     chapter: { type: String },
     examtype: { type: String },
+    quizType: { type: String },
     examdate: { type: String },
     examtime: { type: String },
     schoolcollegid: { type: String },

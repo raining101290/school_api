@@ -11,7 +11,8 @@ const jwtSecret = 'SUPERSECRETE20220';
 const { unlinkSync } = require('fs');
 //const uuidv4  = require('uuid/v4');
 const multer = require('multer');
-
+const mongoose = require('mongoose');
+const ObjectId = mongoose.Types.ObjectId;
 const Stripe_Key =
   "sk_test_51Imd3KJdRrXqreQh3z0UrTxa4vrGI4Ca2WfYvYsg5QI4Dx1oOAgDWv2gpNA13xXDUC9U33O3b1nUoLqwkdYqqz2S00agALdOC6";
 const stripe = require("stripe")(Stripe_Key);
@@ -48,13 +49,33 @@ const Sectionsetup = require('../model/Sectionsetup');
 const answer = require('../model/answer')
 const bkash_model = require('../model/bkash_model')
 const matchanswer = require('../model/matchanswer')
-
+const xsubjects = require('../model/subjectsetup')
+const xpackages = require('../model/package')
+const bkashtokens = require('../model/bkash_token')
+const exam_categories = require('../model/exam_types')
 const auth = require('../middleware/auth'); // authorized token
-
+const axios = require('axios');
 const { exit } = require('process');
+const { generateInvoiceNumber } = require('../utils/functions');
 //const fs = require('fs');
 //const mime = require('mime');
-
+const bkash_dev_url = {
+  base_url: process.env.BK_DEV_BASE_URL,
+  username: process.env.BK_DEV_USERNAME,
+  password: process.env.BK_DEV_PASSWORD,
+  app_key: process.env.BK_DEV_APP_KEY,
+  app_secret: process.env.BK_DEV_APP_SECRET,
+  callback: process.env.BK_DEV_CALLBACK
+}
+const bkash_prod_url = {
+  base_url: process.env.BK_PROD_BASE_URL,
+  username: process.env.BK_PROD_USERNAME,
+  password: process.env.BK_PROD_PASSWORD,
+  app_key: process.env.BK_PROD_APP_KEY,
+  app_secret: process.env.BK_PROD_APP_SECRET,
+  callback: process.env.BK_PROD_CALLBACK
+}
+const environment = bkash_prod_url
 // parse application/x-www-form-urlencoded
 //app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -209,11 +230,9 @@ router.post('/updatetrialstatus', async (req, res, next) => {
     ],
   });
   const id = resp._id;
-const nDate = new Date().toLocaleString('en-US', {
-  timeZone: 'Asia/Dhaka'
-});
-
-console.log(nDate);
+  const nDate = new Date().toLocaleString('en-US', {
+    timeZone: 'Asia/Dhaka'
+  });
 
   bkash_model.findOneAndUpdate({ _id: id },
     {
@@ -327,14 +346,9 @@ router.get(
 //coachingallsubject
 router.get(
   "/coachingallsubject/:xclass/:xgroup/:versionname", async (req, res, next) => {
-    console.log(req.params.xclass)
-    console.log(req.params.xgroup)
-    console.log(req.params.versionname)
-
     const resp = await examsetup.find({
       $and: [
         { classname: req.params.xclass }
-
       ],
     }).sort({ _id: -1 })
       .exec()
@@ -344,8 +358,6 @@ router.get(
       .catch((err) => {
         return res.sendStatus(500);
       });
-
-
   }
 );
 
@@ -1447,7 +1459,6 @@ router.get(
     const resp = await student_exam.find({
       $and: [
         { examid: req.params.id }, { studentid: req.params.studentid }
-
       ],
     })
       .exec()
@@ -1466,11 +1477,9 @@ router.get(
 
 router.get(
   "/getstudentwiseexam/:id/:status", async (req, res, next) => {
-    console.log('dddd')
     const resp = await student_exam.find({
       $and: [
         { studentid: req.params.id }, { status: req.params.status }
-
       ],
     }).sort({ _id: -1 })
       .exec()
@@ -2010,13 +2019,8 @@ router.post('/Addnewstudent', auth, async (req, res, next) => {
 
   }
   else {
-
-
-
-
     const password = "12345678";
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const resp = await examsetup.findOne({
       $or: [
         { _id: req.body.autoid }
@@ -2137,7 +2141,6 @@ router.post('/Addnewstudent', auth, async (req, res, next) => {
 
 //class setup
 router.post('/addnewexam', auth, async (req, res, next) => {
-  console.log(req.body);
   let ts = Date.now();
   let date_ob = new Date(ts);
   let date = date_ob.getDate();
@@ -2149,6 +2152,7 @@ router.post('/addnewexam', auth, async (req, res, next) => {
   const user = {
     examname: req.body.examname,
     examtype: req.body.examtype,
+    quizType: req.body.quizType,
     examdate: req.body.examdate,
     examtime: req.body.examtime,
     schoolcollegid: req.body.schoolcollegid,
@@ -2168,14 +2172,8 @@ router.post('/addnewexam', auth, async (req, res, next) => {
     updateby: req.username,
     enteredtime: datetime,
     updatetime: datetime
-
   }
   try {
-    /*   || user.examtype == null || user.examdate == null ||
-      user.examtime == null || user.schoolcollegid == null || 
-      user.schoolcollegename == null || user.xgroup == null || 
-      user.xsection == null || user.examfees == null || user.noofstudent == null ||
-      user.examstatus == null */
 
     if (user.examname == null
     ) {
@@ -2192,7 +2190,6 @@ router.post('/addnewexam', auth, async (req, res, next) => {
           res.send('save');
         }
       });
-
     }
 
   }
@@ -6105,7 +6102,8 @@ router.post('/updateexams', (req, res, next) => {
   examsetup.findOneAndUpdate({ _id: req.body.autoid },
     {
       examname: req.body.examname,
-	  chapter: req.body.chapter,
+	    chapter: req.body.chapter,
+      quizType: req.body.quizType,
       examtype: req.body.examtype,
       examdate: req.body.examdate,
       subjectname: req.body.subjectname,
@@ -7366,21 +7364,12 @@ router.get(
       .catch((err) => {
         return res.sendStatus(500);
       });
-
-
   }
 );
 
 
 router.get(
   "/subjectwisedatachapter/:classname/:xgroup/:versionname/:subjectname/:chapter", async (req, res, next) => {
-
-    console.log('xclass ' + req.params.classname)
-    console.log('xgroup ' + req.params.xgroup)
-    console.log('version name ' + req.params.versionname)
-    console.log('subjectname ' + req.params.subjectname)
-console.log('chapter ' + req.params.chapter)
-
     const resp = await examsetup.find({
       $and: [
         { classname: req.params.classname },
@@ -7398,8 +7387,6 @@ console.log('chapter ' + req.params.chapter)
       .catch((err) => {
         return res.sendStatus(500);
       });
-
-
   }
 );
 
@@ -7431,8 +7418,6 @@ router.get(
 
 router.get(
   "/ownexambystudent/:studentid", async (req, res, next) => {
-    console.log(req.params.examstatus)
-    console.log(req.params.status)
     const resp = await answer.find({
       $and: [
         { studentid: req.params.studentid }
@@ -7446,8 +7431,6 @@ router.get(
       .catch((err) => {
         return res.sendStatus(500);
       });
-
-
   }
 );
 
@@ -7455,25 +7438,264 @@ router.get(
 
 router.get(
   "/coachingcourse/:xclass/:xgroup/:versionname", async (req, res, next) => {
-    console.log(req.params.xclass)
-    console.log(req.params.xgroup)
-    const resp = await examsetup.find({
-      $and: [
-        { classname: req.params.xclass }, { xgroup: req.params.xgroup }, { versionname: req.params.versionname }
-
-      ],
-    }).sort({ _id: -1 })
-      .exec()
-      .then((resp) => {
-        return res.status(200).json(resp);
-      })
-      .catch((err) => {
-        return res.sendStatus(500);
-      });
-
-
+    // const resp = await examsetup.find({
+    //   $and: [
+    //     { classname: req.params.xclass }, { xgroup: req.params.xgroup }, { versionname: req.params.versionname }
+    //   ],
+    // }).sort({ _id: -1 })
+    //   .exec()
+    //   .then((resp) => {
+    //     return res.status(200).json(resp);
+    //   })
+    //   .catch((err) => {
+    //     return res.sendStatus(500);
+    //   });
+    try {
+      let query = {
+        classname: req.params.xclass,
+        xgroup: req.params.xgroup,
+        versionname: req.params.versionname
+      };
+      // Check if the 'subjectname' query parameter is provided
+      // if (req.query.subjectname) {
+      //   query.subjectname = req.query.subjectname;
+      // }
+      // if (req.query.quiztype) {
+      //   query.quiztype = req.query.quiztype;
+      // }
+      //console.log(' query::', query)
+      const resp = await examsetup.find(query)
+        .sort({ _id: -1 })
+        .exec();
+      return res.status(200).json(resp);
+    } catch (error) {
+      console.error(error);
+      return res.sendStatus(500);
+    }
   }
 );
+
+router.get('/subjectwisecourses', async (req, res) => {
+  try {
+    let query = {}; // Default empty query
+    // Check if the 'subject' query parameter is provided
+    if (req.query.classname) {
+      // If 'subject' query parameter is provided, create a case-insensitive regex for partial matching
+      query.classname = req.query.classname
+    }
+    if (req.query.group) {
+      // If 'subject' query parameter is provided, create a case-insensitive regex for partial matching
+      query.xgroup = req.query.group
+    }
+    if (req.query.version) {
+      // If 'subject' query parameter is provided, create a case-insensitive regex for partial matching
+      query.versionname = req.query.version
+    }
+    if (req.query.subject) {
+      // If 'subject' query parameter is provided, create a case-insensitive regex for partial matching
+      query.subjectname = req.query.subject
+    }
+    // Find documents based on the query
+    const exams = await examsetup.find(query)
+    res.json(exams);
+  }catch(ex){
+    res.status(500).json({ message: ex });
+  }
+});
+
+//Get Uniq Subject Name 
+router.get('/allSubjects', async (req, res) => {
+  try {
+    let query = {}; // Default empty query
+    // Check if the 'subject' query parameter is provided
+    if (req.query.subject) {
+      // If 'subject' query parameter is provided, create a case-insensitive regex for partial matching
+      query.name = { $regex: new RegExp(req.query.subject, 'i') };
+    }
+    // Find documents based on the query
+    const subjects = await xsubjects.find(query).limit(20);
+    res.json(subjects);
+  }catch(ex){
+    res.status(500).json({ message: ex });
+  }
+});
+
+  router.get('/getPackages', (req, res) => {
+    xpackages.find()
+      .sort({ updatedAt: -1 })
+      .exec()
+      .then((resp) => {
+        return res.status(200).json(resp); // Send the response once it's available
+      })
+      .catch((err) => {
+        return res.sendStatus(500); // Handle errors appropriately
+      });
+  })
+
+router.get('/package/:id', async (req, res) => {
+  const { id } = req.params;
+  // Validate the ID
+  if (!ObjectId.isValid(id)) {
+    // If the ID is not a valid ObjectId, respond with a 400 Bad Request status
+    return res.status(400).json({ code:400,  message: 'Invalid ID format' });
+  }else{
+  try {
+    const packageObj = await xpackages.findOne({
+      _id: req.params.id,
+    }).exec();
+    // Check if package was found
+    if (!packageObj) {
+      // If no package is found, send a 404 Not Found response
+      return res.status(404).json({ code:404, message: 'Package not found' });
+    }
+    // If a package is found, send a 200 OK response with the package data
+    return res.status(200).json(packageObj);
+  } catch (err) {
+    // Handle any errors that occur during the database query
+    console.error(err);
+    return res.status(500).json({ code:500,  message: 'Internal server error' });
+  }
+}
+})
+
+router.post('/addPackage', (req,res)=> {
+  const packageObj = new xpackages({
+    packagename: req.body.packagename,
+    type: req.body.type,
+    class: req.body.classname,
+    versionname: req.body.versionname,
+    group: req.body.group,
+    price: req.body.price
+  });
+  packageObj.save().then(result => {
+    res.status(201).json({
+      message: "Created",
+    })
+  }).catch(err => {
+      res.status(500).json({
+        error: err
+      });
+  })
+})
+
+router.put('/updatePackage/:id', async (req, res) => {
+  const { id } = req.params;
+
+  // Validate the ID
+  if (!ObjectId.isValid(id)) {
+      // If the ID is not valid, respond with a 400 Bad Request status
+      return res.status(400).json({ message: 'Invalid ID format' });
+  }
+  // Get the updated data from the request body
+  const updatedData = req.body;
+
+  try {
+      // Find the package by ID and update its fields
+      const updatedPackage = await xpackages.findByIdAndUpdate(
+          id,
+          updatedData,
+          { new: true } // Return the updated package
+      ).exec();
+
+      // Check if package was found and updated
+      if (!updatedPackage) {
+          // If no package is found, send a 404 Not Found response
+          return res.status(404).json({ message: 'Package not found' });
+      }
+
+      // If package was found and updated successfully, send a 200 OK response with the updated package data
+      return res.status(200).json(updatedPackage);
+  } catch (err) {
+      // Handle any errors that occur during the update process
+      console.error(err);
+      return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+router.delete('/deletePackage/:id', (req, res) => {
+  xpackages.remove({ _id: req.params.id }, function (err) {
+    if (err) {
+      res.send(err);
+    }
+    else {
+      return res.status(200).json({
+        status: "deleted",
+      });
+    }
+  });
+})
+
+router.get('/getPackagePrice', async (req, res) => {
+  try {
+    let query = {}; 
+    if (req.query.classname) {
+      query.class = req.query.classname
+    }
+    if (req.query.group) {
+      query.group = req.query.group
+    }
+    if (req.query.version) {
+      query.versionname = req.query.version
+    }
+    if (req.query.type) {
+      query.type = req.query.type
+    }
+    const packageObj = await xpackages.findOne(query)
+    res.json(packageObj);
+  }catch(ex){
+    res.status(500).json({ message: ex });
+  }
+});
+
+//get all courses Group_By Subjectname from the "xexams" collection
+router.get("/allcourses", async (req, res, next) => {
+  try {
+  const { classname, group, version, subject } = req.query;
+
+  // Construct the aggregation pipeline based on the provided filters
+  let pipeline = [
+    {
+      $match: {}
+    },
+    {
+      $group: {
+        _id: '$subjectname', // Group by subjectname
+        count: { $sum: 1 }, // Count the occurrences of each subjectname
+        id: { $first: '$_id' } // Take the _id of the first document in each group
+      }
+    },
+    {
+      $project: {
+        _id: '$id', // Project the _id field
+        subjectname: '$_id', // Project the subjectname
+        count: 1 // Project the count field
+      }
+    }
+  ];
+
+  // Add filter conditions based on the provided parameters
+  if (classname) {
+    pipeline[0].$match.classname = classname;
+  }
+  if (group) {
+    pipeline[0].$match.xgroup = group;
+  }
+  if (version) {
+    pipeline[0].$match.versionname = version;
+  }
+  if(subject){
+    pipeline[0].$match.subjectname = subject;
+  }
+
+  // Execute the aggregation pipeline
+  const result = await examsetup.aggregate(pipeline);
+  // Send the aggregated result as the response
+  res.json({result, totalCount: result.length});
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 router.post('/bkashpaymentonline', async (req, res, next) => {
 	const nDate = new Date().toLocaleString('en-US', {
@@ -7482,8 +7704,8 @@ router.post('/bkashpaymentonline', async (req, res, next) => {
 
   const user = {
     studentid: req.body.studentid,
-	packageid: req.body.packageid,
-	packagename: req.body.packagename,
+    packageid: req.body.packageid,
+    packagename: req.body.packagename,
     classname: req.body.classname,
     groupname: req.body.groupname,
     mobileno: req.body.bkashno,
@@ -7491,7 +7713,7 @@ router.post('/bkashpaymentonline', async (req, res, next) => {
     purchasedate: nDate,
     amount: req.body.amount,
     examname: req.body.classname,
-    status: 'approve',
+    status: 'approved',
     currency: req.body.currency,
     enteredby: req.username,
     updateby: req.username,
@@ -7519,6 +7741,57 @@ router.post('/bkashpaymentonline', async (req, res, next) => {
 
 })
 
+router.post('/bkashpayment', async (req, res, next) => {
+	const nDate = new Date().toLocaleString('en-US', {
+	timeZone: 'Asia/Dhaka'
+	});
+
+  const user = {
+    studentid: req.body.studentid,
+    packageid: req.body.packageid,
+    packagename: req.body.packagename,
+    classname: req.body.className,
+    groupname: req.body.groupname,
+    purchasedate: nDate,
+    type: req.body.type,
+    amount: req.body.amount,
+    currency: req.body.currency,
+    status: 'approved',
+    version: req.body.version,
+    invNo: req.body.invNo,
+    reference: req.body.reference,
+    mobileno: req.body.bkashno,
+    trxID: req.body.trxID,
+    paymentID: req.body.paymentID,
+    bkashObject: req.body.bkashObj
+  }
+
+  const existingUser = await bkash_model.findOne({
+    studentid: req.body.studentid,
+    packageid: req.body.packageid
+  });
+  if (existingUser) {
+    return res.status(400).json({
+      status: "exist",
+    });
+  }
+
+  try {
+    const new_user = new bkash_model(user);
+    const save_user = await new_user.save();
+    if (save_user)
+      res.status(200).json({
+        message: "success",
+      })
+    else
+      return res.status(400).json({
+        status: "failed",
+      });
+  } catch (e) {
+    return res.status(500).json(e);
+  }
+})
+
 
 router.post('/insertpaymentbkash', async (req, res, next) => {
 
@@ -7535,7 +7808,7 @@ router.post('/insertpaymentbkash', async (req, res, next) => {
     currency: req.body.currency,
     enteredby: req.username,
     updateby: req.username,
-    status: 'approve',
+    status: 'approved',
     enteredtime: Date.now(),
     updatetime: Date.now()
   }
@@ -7592,7 +7865,7 @@ router.get('/approvepayment/:transid', (req, res, next) => {
   }
   bkash_model.findOneAndUpdate({ _id: req.params.transid },
     {
-      status: 'approve'
+      status: 'approved'
     },
     function (
       err,
@@ -7604,14 +7877,12 @@ router.get('/approvepayment/:transid', (req, res, next) => {
         res.send('save');
       }
     });
-
 })
 
 router.get(
   "/getDatacheckpayment/:studentid", async (req, res, next) => {
-    const resp = await bkash_model.find({ studentid: req.params.studentid, status: 'approve' }).exec()
+    const resp = await bkash_model.find({ studentid: req.params.studentid, status: 'approved' }).count()
       .then((resp) => {
-        console.log('resp::', resp)
         return res.status(200).json(resp);
       })
       .catch((err) => {
@@ -7620,12 +7891,42 @@ router.get(
   }
 );
 
+router.get("/checkUserPayment", async (req, res, next) => {
+    const { studentid, className, group, type, version } = req.query;
+    let query = {}
+    if (studentid) {
+      query.studentid = studentid
+    }
+    if (className) {
+      query.classname = className
+    }
+    if (type) {
+      query.type = type
+    }
+    if (version) {
+      query.version = version
+    }
+    if (group) {
+      query.groupname = group
+    }
+    query.status = 'approved'
+    //query.status = 'approve'
+    const resp = await bkash_model.findOne(query).exec()
+      .then((resp) => {
+        return res.status(200).json(resp);
+      })
+      .catch((err) => {
+        return res.sendStatus(500);
+      });
+    }
+);
+
 router.get(
   "/getDatacheckpayment/:studentid", async (req, res, next) => {
 
     const resp = await bkash_model.find({
       $and: [
-        { studentid: req.params.studentid }, { status: 'approve' }
+        { studentid: req.params.studentid }, { status: 'approved' }
 
       ],
     }).count()
@@ -7649,6 +7950,7 @@ router.get(
     const resp = await bkash_model.find({
       $and: [
         { studentid: req.params.studentid }, { status: 'expair' }, { packagename: 'Trial' }
+
       ],
     }).count()
 
@@ -7889,9 +8191,6 @@ router.post("/deletestudentexamid", function (req, res) {
   });
 })
 
-
-
-
 router.get(
   "/getoldexamid/:examid/:studentid", async (req, res, next) => {
 
@@ -7911,9 +8210,295 @@ router.get(
       .catch((err) => {
         return res.sendStatus(500);
       });
-
   }
 );
+
+
+const bkaash_headers = { 
+  'Content-Type': 'application/json', 
+  'username': environment.username,
+  'password': environment.password,
+}
+
+router.get('/getExamTypes', (req, res) => {
+  exam_categories.find({status:1})
+    .exec()
+    .then((resp) => {
+      return res.status(200).json(resp); // Send the response once it's available
+    })
+    .catch((err) => {
+      return res.sendStatus(500); // Handle errors appropriately
+    });
+})
+
+router.post('/addexamtype', (req,res)=> {
+  const user = new exam_categories({
+    id: req.body.title,
+    title: req.body.title,
+    status: req.body.status
+  });
+  user.save().then(result => {
+    res.status(201).json({
+      message: "Created",
+    })
+  }).catch(err => {
+      res.status(500).json({
+        error: err
+      });
+  })
+})
+router.delete('/deleteExamType/:id', (req, res) => {
+  exam_categories.remove({ _id: req.params.id }, function (err) {
+    if (err) {
+      res.send(err);
+    }
+    else {
+      return res.status(200).json({
+        status: "deleted",
+      });
+    }
+  });
+})
+
+// router.get("/getToken", async function (req, res) {
+//   const endpoint = '/token/grant';
+//   const url = environment.base_url + endpoint;
+
+//   let config = {
+//     method: 'post',
+//     maxBodyLength: Infinity,
+//     url: url,
+//     headers: bkaash_headers,
+//     data : JSON.stringify({
+//       "app_key": environment.app_key,
+//       "app_secret": environment.app_secret
+//     })
+//   };
+
+//   axios.request(config)
+//   .then((response) => {
+//     res.status(200).json(response.data);
+//   })
+//   .catch((error) => {
+//     res.status(403).json(error);
+//   });
+// });
+
+async function getToken() {
+  try {
+    const endpoint = '/token/grant';
+    const url = environment.base_url + endpoint;
+
+    const config = {
+      method: 'post',
+      url: url,
+      headers: bkaash_headers,
+      data: {
+        "app_key": environment.app_key,
+        "app_secret": environment.app_secret
+      }
+    };
+    const response = await axios.request(config);
+    if (response?.data) {
+      const token = response.data.id_token;
+      const expires = response.data.expires_in;
+      const refresh_token = response.data.refresh_token;
+      // Update token in the database
+      await bkashtokens.findOneAndUpdate(
+        { type: 'bkash' },
+        { token: token, expires: expires, refresh_token: refresh_token }
+      ).exec();
+      return { code: 200, token: token };
+    }
+  } catch (error) {
+    return { code: 403, token: null };
+  }
+}
+
+router.get("/getRefreshToken", async function (req, res) {
+  const endpoint = '/token/refresh';
+  const url = environment.base_url + endpoint;
+
+  let config = {
+    method: 'post',
+    maxBodyLength: Infinity,
+    url: url,
+    headers: bkaash_headers,
+    data : JSON.stringify({
+      "app_key": environment.app_key,
+      "app_secret": environment.app_secret,
+      "refresh_token": req?.body?.refresh_token
+    })
+  };
+
+  axios.request(config)
+  .then((response) => {
+    res.status(200).json(response.data);
+  })
+  .catch((error) => {
+    res.status(403).json(error);
+  });
+
+});
+
+router.post("/createPayment", async function (req, res) {
+  const newToken = await getToken();
+  const endpoint = '/create';
+  const url = environment.base_url + endpoint;
+  const xAppKey = environment.app_key
+  const bkashObj = await bkashtokens.findOne({ type: 'bkash' }).exec()
+  if (!bkashObj) {
+    return res.status(500).json({ message: 'No token found in database' });
+  }
+  let token = bkashObj.token
+
+  let config = {
+    method: 'post',
+    url: url,
+    headers: {...bkaash_headers, "Authorization": token, "X-App-Key":xAppKey},
+    data : JSON.stringify({  
+      "mode": "0011",
+      "payerReference": req.body.reference,
+      "callbackURL": environment.callback,
+      "merchantAssociationInfo": '',
+      "amount": req.body.amount,
+      "currency": "BDT",
+      "intent": "sale",
+      "merchantInvoiceNumber": generateInvoiceNumber()
+   })
+  };
+  try {
+    const response = await axios.request(config);
+    res.status(200).json(response.data);
+  } catch (error) {
+    if (error.response) {
+      const { status, statusText, data } = error.response;
+      if (statusText === 'Unauthorized') {
+        const newToken = await getToken();
+        config.headers.Authorization = newToken.token;
+        const response = await axios.request(config);
+        res.status(200).json(response.data);
+      } else {
+        res.status(status).json({ code: status, message: statusText, data });
+      }
+    } else {
+      res.status(500).json({ code: 500, message: 'Internal Server Error' });
+    }
+  }
+});
+
+router.post("/executePayment", async function (req, res) {
+  const endpoint = '/execute';
+  const url = environment.base_url + endpoint;
+  const xAppKey = environment.app_key
+  const bkashObj = await bkashtokens.findOne({ type: 'bkash' }).exec()
+  if (!bkashObj) {
+    return res.status(500).json({ message: 'No token found in database' });
+  }
+  let token = bkashObj.token
+  let config = {
+    method: 'post',
+    maxBodyLength: Infinity,
+    url: url,
+    headers: {...bkaash_headers, "Authorization": token, "X-App-Key": xAppKey},
+    data : JSON.stringify({
+      "paymentID" : req.body.paymentID
+    })
+  };
+  axios.request(config)
+  .then((response) => {
+    res.status(200).json(response.data);
+  })
+  .catch((error) => {
+    res.status(403).json(error);
+  });
+});
+
+router.post("/queryPayment", async function (req, res) {
+  const endpoint = '/payment/status';
+  const url = environment.base_url + endpoint;
+  const xAppKey = environment.app_key
+  const bkashObj = await bkashtokens.findOne({ type: 'bkash' }).exec()
+  if (!bkashObj) {
+    return res.status(500).json({ message: 'No token found in database' });
+  }
+  let token = bkashObj.token
+  let config = {
+    method: 'post',
+    maxBodyLength: Infinity,
+    url: url,
+    headers: {...bkaash_headers, "Authorization": req.headers['token'], "X-App-Key":xAppKey},
+    data : JSON.stringify({
+      "paymentID" : req.body.paymentID
+    })
+  };
+  axios.request(config)
+  .then((response) => {
+    res.status(200).json(response.data);
+  })
+  .catch((error) => {
+    res.status(403).json(error);
+  });
+});
+
+router.post("/refund", async function (req, res) {
+  const endpoint = '/payment/refund';
+  const url = environment.base_url + endpoint;
+  const bkashObj = await bkashtokens.findOne({ type: 'bkash' }).exec()
+  if (!bkashObj) {
+    return res.status(500).json({ message: 'No token found in database' });
+  }
+  let token = bkashObj.token
+  const xAppKey = environment.app_key
+  let config = {
+    method: 'post',
+    maxBodyLength: Infinity,
+    url: url,
+    headers: {...bkaash_headers, "Authorization": token, "X-App-Key":xAppKey},
+    data : JSON.stringify({
+      "paymentID" : req.body.paymentID,
+      "amount": req.body.amount,
+      "trxID":  req.body.trxID,
+      "sku":  req.body.sku,
+      "reason":  req.body.sku,
+    })
+  };
+  axios.request(config)
+  .then((response) => {
+    res.status(200).json(response.data);
+  })
+  .catch((error) => {
+    res.status(403).json(error);
+  });
+});
+
+router.post("/refundStatus", async function (req, res) {
+  const endpoint = '/payment/refund';
+  const url = environment.base_url + endpoint;
+  const bkashObj = await bkashtokens.findOne({ type: 'bkash' }).exec()
+  if (!bkashObj) {
+    return res.status(500).json({ message: 'No token found in database' });
+  }
+  let token = bkashObj.token
+  const xAppKey = environment.app_key
+  let config = {
+    method: 'post',
+    maxBodyLength: Infinity,
+    url: url,
+    headers: {...bkaash_headers, "Authorization": req.headers['token'], "X-App-Key":xAppKey},
+    data : JSON.stringify({
+      "paymentID" : req.body.paymentID,
+      "trxID":  req.body.trxID
+    })
+  };
+  axios.request(config)
+  .then((response) => {
+    res.status(200).json(response.data);
+  })
+  .catch((error) => {
+    res.status(403).json(error);
+  });
+});
 
 
 module.exports = router;
