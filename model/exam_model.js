@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 
 const ExamSchema = mongoose.Schema({
-
     examname: { type: String, required: true },
     chapter: { type: String },
     examtype: { type: String },

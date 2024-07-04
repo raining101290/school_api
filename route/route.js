@@ -2706,29 +2706,51 @@ router.post('/Bimageupload', upload.single('profileImg'), async (req, res, next)
 
 //writing  answer user jpg upload to answer
 router.post('/examimageupdate', upload.single('profileImg'), async (req, res, next) => {
+  try {
+    if (!req.body.autoincrement) {
+      return res.status(400).send('autoincrement not found');
+    }
 
-  console.log('Email Address....' + req.body.autoincrement);
-  if (!req.body.autoincrement) {
-    console.log('not found');
-    return;
+    const autoincrement = req.body.autoincrement;
+    const imagePath = '/public/' + req.file.filename;
+
+    // Ensure autoincrement is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(autoincrement)) {
+      return res.status(400).send('Invalid autoincrement ID');
+    }
+
+    const result = await examsetup.findOneAndUpdate(
+      { _id: mongoose.Types.ObjectId(autoincrement) },
+      { image: imagePath },
+      { new: true } // Return the updated document
+    );
+
+    if (!result) {
+      return res.status(404).send('Document not found');
+    }
+    res.send('save');
+  } catch (err) {
+    res.send(err);
   }
-
-  examsetup.findOneAndUpdate({ _id: req.body.autoincrement },
-    {
-      image: '/public/' + req.file.filename,
-    },
-    function (
-      err,
-      result
-    ) {
-      if (err) {
-        res.send(err);
-      } else {
-        res.send('save');
-      }
-    });
-
-
+  // if (!req.body.autoincrement) {
+  //   console.log('not found');
+  //   return;
+  // }
+  // console.log('logging', req.body.autoincrement)
+  // examsetup.findOneAndUpdate({ _id: req.body.autoincrement },
+  //   {
+  //     image: '/public/' + req.file.filename,
+  //   },
+  //   function (
+  //     err,
+  //     result
+  //   ) {
+  //     if (err) {
+  //       res.send(err);
+  //     } else {
+  //       res.send('save');
+  //     }
+  //   });
 })
 
 
@@ -2825,7 +2847,7 @@ router.post('/Aimageupload_useranswerfileupload', upload.single('profileImg'), a
 
 //Aimageupload
 router.post('/Aimageupload', upload.single('profileImg'), async (req, res, next) => {
-  const url = req.protocol + '://' + req.get('host')
+  //const url = req.protocol + '://' + req.get('host')
   console.log('Email Address....' + req.body.autoincrement);
 
   try {
@@ -2913,36 +2935,63 @@ router.get('/imageviewnodejs/:fileName', (req, res, next) => { //OKAYH?? oh prb 
 
 ///////////////////////////////////////////////////////
 router.post('/questionimageupload', upload.single('profileImg'), async (req, res, next) => {
-  const url = req.protocol + '://' + req.get('host')
-  console.log('Email Address....' + req.body.autoincrement);
   try {
-    quizsetup.findByIdAndUpdate({ _id: req.body.autoincrement },
-      {
-        questiontype: req.body.questiontype,
-        questionimage: '/public/' + req.file.filename,
-      },
-      function (
-        err,
-        result
-      ) {
-        if (err) {
+    if (!req.body.autoincrement) {
+      return res.status(400).send('autoincrement not found');
+    }
 
-          res.send(err);
-          //res.send('Failed to upload files');
-        } else {
+    const autoincrement = req.body.autoincrement;
+    //const imagePath = '/public/' + req.file.filename;
 
-          return res.status(400).json({
-            status: "found",
-          });
-          //return res.status(403).send({ status: "Not Match" });
-          // res.json(result);
-        }
-      });
+    // Ensure autoincrement is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(autoincrement)) {
+      return res.status(400).send('Invalid autoincrement ID');
+    }
 
-  } catch (e) {
-    console.log("erro ", e);
-    return res.status(500).json(e);
+    const result = await quizsetup.findOneAndUpdate(
+      { _id: req.body.autoincrement },
+      { 
+        questiontype: req.body.questiontype , 
+        questionimage: '/public/' + req.file.filename ,
+        new: true 
+      } // Return the updated document
+    );
+    
+    if (!result) {
+      return res.status(404).send('Document not found');
+    }
+    res.send('save');
+  } catch (err) {
+    res.send(err);
   }
+  // try {
+  //   quizsetup.findByIdAndUpdate({ _id: req.body.autoincrement },
+  //     {
+  //       questiontype: req.body.questiontype,
+  //       questionimage: '/public/' + req.file.filename,
+  //     },
+  //     function (
+  //       err,
+  //       result
+  //     ) {
+  //       if (err) {
+
+  //         res.send(err);
+  //         //res.send('Failed to upload files');
+  //       } else {
+
+  //         return res.status(400).json({
+  //           status: "found",
+  //         });
+  //         //return res.status(403).send({ status: "Not Match" });
+  //         // res.json(result);
+  //       }
+  //     });
+
+  // } catch (e) {
+  //   console.log("erro ", e);
+  //   return res.status(500).json(e);
+  // }
 
 
 })
@@ -4427,7 +4476,6 @@ router.get(
     const resp = await examsetup.find({
       $and: [
         { schoolcollegid: req.params.id }, { enteredby: req.params.teacherid }
-
       ],
     }).sort({ _id: -1 })
       .exec()
@@ -7376,8 +7424,7 @@ router.get(
         { xgroup: req.params.xgroup },
         { versionname: req.params.versionname },
         { subjectname: req.params.subjectname },
-		{ chapter: req.params.chapter }
-
+		    { chapter: req.params.chapter }
       ],
     }).sort({ _id: -1 })
       .exec()
@@ -7651,7 +7698,7 @@ router.get('/getPackagePrice', async (req, res) => {
 router.get("/allcourses", async (req, res, next) => {
   try {
   const { classname, group, version, subject } = req.query;
-
+  console.log('Version#####', classname, group, version )
   // Construct the aggregation pipeline based on the provided filters
   let pipeline = [
     {
