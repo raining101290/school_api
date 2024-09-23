@@ -17,6 +17,7 @@ const QuizSchema = mongoose.Schema({
       questiontype: { type : String },
       questiontitle: { type : String },
       questionimage: { type : String },
+      answerimage: { type : String },
       Atype:  { type : String },
       Atitle:  { type : String },
       Aimage:  { type : String },

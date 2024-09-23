@@ -367,7 +367,6 @@ router.get(
     const resp = await groupsetup.find()
       .exec()
       .then((resp) => {
-
         const page = parseInt(req.params.page)
         const limit = parseInt(req.params.limit)
         const startIndex = (page - 1) * limit
@@ -1985,7 +1984,12 @@ router.post('/signupstudent', async (req, res, next) => {
             res.send('error');
           }
           else {
-            res.send('save');
+            const token = jwt.sign({
+              username: req.body.email
+            }, process.env.JWT_token, {
+              expiresIn: '12h'
+            })
+            res.send({result:'save', token: token});
           }
         });
 
@@ -2152,7 +2156,7 @@ router.post('/addnewexam', auth, async (req, res, next) => {
   const user = {
     examname: req.body.examname,
     examtype: req.body.examtype,
-    quizType: req.body.quizType,
+    quiztype: req.body.quiztype,
     examdate: req.body.examdate,
     examtime: req.body.examtime,
     schoolcollegid: req.body.schoolcollegid,
@@ -2996,6 +3000,38 @@ router.post('/questionimageupload', upload.single('profileImg'), async (req, res
 
 })
 
+
+
+router.post('/answerImageeUpload', upload.single('profileImg'), async (req, res, next) => {
+  try {
+    if (!req.body.autoincrement) {
+      return res.status(400).send('autoincrement not found');
+    }
+    
+    const autoincrement = req.body.autoincrement;
+    //const imagePath = '/public/' + req.file.filename;
+    // Ensure autoincrement is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(autoincrement)) {
+      return res.status(400).send('Invalid autoincrement ID');
+    }
+
+    const result = await quizsetup.findOneAndUpdate(
+      { _id: req.body.autoincrement },
+      { 
+        questiontype: req.body.questiontype , 
+        answerimage: '/public/' + req.file.filename ,
+        new: true 
+      } // Return the updated document
+    );
+    
+    if (!result) {
+      return res.status(404).send('Document not found');
+    }
+    res.send('save');
+  } catch (err) {
+    res.send(err);
+  }
+})
 
 
 
@@ -6151,7 +6187,7 @@ router.post('/updateexams', (req, res, next) => {
     {
       examname: req.body.examname,
 	    chapter: req.body.chapter,
-      quizType: req.body.quizType,
+      quiztype: req.body.quiztype,
       examtype: req.body.examtype,
       examdate: req.body.examdate,
       subjectname: req.body.subjectname,
@@ -7390,21 +7426,20 @@ router.post("/deletestudentfromexam", auth, function (req, res) {
 
 router.get(
   "/subjectwisedata/:classname/:xgroup/:versionname/:subjectname", async (req, res, next) => {
-
-    console.log('xclass ' + req.params.classname)
-    console.log('xgroup ' + req.params.xgroup)
-    console.log('version name ' + req.params.versionname)
-    console.log('subjectname ' + req.params.subjectname)
-
-    const resp = await examsetup.find({
-      $and: [
-        { classname: req.params.classname },
-        { xgroup: req.params.xgroup },
-        { versionname: req.params.versionname },
-        { subjectname: req.params.subjectname }
-
-      ],
-    }).sort({ _id: -1 })
+    let query = {
+      classname: req.params.classname,
+      xgroup: req.params.xgroup,
+      versionname: req.params.versionname,
+      subjectname: req.params.subjectname,
+    };
+    // Check if the 'subjectname' query parameter is provided
+    // if (req.query.subjectname) {
+    //   query.subjectname = req.query.subjectname;
+    // }
+    if (req.query.quiztype) {
+      query.quiztype= req.query.quiztype;
+    }
+    const resp = await examsetup.find(query).sort({ _id: -1 })
       .exec()
       .then((resp) => {
         return res.status(200).json(resp);
@@ -7507,9 +7542,9 @@ router.get(
       // if (req.query.subjectname) {
       //   query.subjectname = req.query.subjectname;
       // }
-      // if (req.query.quiztype) {
-      //   query.quiztype = req.query.quiztype;
-      // }
+      if (req.query.quiztype) {
+        query.quiztype= req.query.quiztype;
+      }
       //console.log(' query::', query)
       const resp = await examsetup.find(query)
         .sort({ _id: -1 })
@@ -7605,8 +7640,11 @@ router.get('/package/:id', async (req, res) => {
 }
 })
 
-router.post('/addPackage', (req,res)=> {
+
+router.post('/addPackage', (req, res) => {
+  const newObjectId = new mongoose.Types.ObjectId();
   const packageObj = new xpackages({
+    packageid: newObjectId,
     packagename: req.body.packagename,
     type: req.body.type,
     class: req.body.classname,
@@ -7614,16 +7652,47 @@ router.post('/addPackage', (req,res)=> {
     group: req.body.group,
     price: req.body.price
   });
-  packageObj.save().then(result => {
-    res.status(201).json({
-      message: "Created",
-    })
-  }).catch(err => {
-      res.status(500).json({
-        error: err
+
+  packageObj.save()
+    .then(result => {
+      res.status(201).json({
+        message: "Created",
+        package: result
       });
-  })
-})
+    })
+    .catch(err => {
+      if (err.code === 11000) { // Duplicate key error
+        res.status(409).json({
+          error: "Duplicate packagename"
+        });
+      } else {
+        res.status(500).json({
+          error: err.message
+        });
+      }
+    });
+});
+// router.post('/addPackage', (req,res)=> {
+//   const newObjectId = new mongoose.Types.ObjectId();
+//   const packageObj = new xpackages({
+//     packageid: newObjectId,
+//     packagename: req.body.packagename,
+//     type: req.body.type,
+//     class: req.body.classname,
+//     versionname: req.body.versionname,
+//     group: req.body.group,
+//     price: req.body.price
+//   });
+//   packageObj.save().then(result => {
+//     res.status(201).json({
+//       message: "Created",
+//     })
+//   }).catch(err => {
+//       res.status(500).json({
+//         error: err
+//       });
+//   })
+// })
 
 router.put('/updatePackage/:id', async (req, res) => {
   const { id } = req.params;
@@ -7695,10 +7764,9 @@ router.get('/getPackagePrice', async (req, res) => {
 });
 
 //get all courses Group_By Subjectname from the "xexams" collection
-router.get("/allcourses", async (req, res, next) => {
+router.get("/allcourses", auth, async (req, res, next) => {
   try {
   const { classname, group, version, subject } = req.query;
-  console.log('Version#####', classname, group, version )
   // Construct the aggregation pipeline based on the provided filters
   let pipeline = [
     {
@@ -7744,7 +7812,7 @@ router.get("/allcourses", async (req, res, next) => {
   }
 });
 
-router.post('/bkashpaymentonline', async (req, res, next) => {
+router.post('/bkashpaymentonline', auth, async (req, res, next) => {
 	const nDate = new Date().toLocaleString('en-US', {
 	timeZone: 'Asia/Dhaka'
 	});
@@ -7788,7 +7856,7 @@ router.post('/bkashpaymentonline', async (req, res, next) => {
 
 })
 
-router.post('/bkashpayment', async (req, res, next) => {
+router.post('/bkashpayment', auth, async (req, res, next) => {
 	const nDate = new Date().toLocaleString('en-US', {
 	timeZone: 'Asia/Dhaka'
 	});
@@ -7840,9 +7908,7 @@ router.post('/bkashpayment', async (req, res, next) => {
 })
 
 
-router.post('/insertpaymentbkash', async (req, res, next) => {
-
-
+router.post('/insertpaymentbkash', auth, async (req, res, next) => {
   const user = {
     studentid: req.body.studentid,
     classname: req.body.classname,
@@ -7938,7 +8004,7 @@ router.get(
   }
 );
 
-router.get("/checkUserPayment", async (req, res, next) => {
+router.get("/checkUserPayment", auth, async (req, res, next) => {
     const { studentid, className, group, type, version } = req.query;
     let query = {}
     if (studentid) {
@@ -7969,7 +8035,7 @@ router.get("/checkUserPayment", async (req, res, next) => {
 );
 
 router.get(
-  "/getDatacheckpayment/:studentid", async (req, res, next) => {
+  "/getDatacheckpayment/:studentid", auth, async (req, res, next) => {
 
     const resp = await bkash_model.find({
       $and: [
@@ -7992,7 +8058,7 @@ router.get(
   }
 );
 router.get(
-  "/checktrialdata/:studentid", async (req, res, next) => {
+  "/checktrialdata/:studentid", auth, async (req, res, next) => {
 
     const resp = await bkash_model.find({
       $and: [
@@ -8017,7 +8083,7 @@ router.get(
 
 
 router.get(
-  "/alltrialdata", async (req, res, next) => {
+  "/alltrialdata", auth, async (req, res, next) => {
 
     const resp = await bkash_model.find()
 
@@ -8037,7 +8103,7 @@ router.get(
 
 
 router.get(
-  "/getstudentpackageinfo/:studentid", async (req, res, next) => {
+  "/getstudentpackageinfo/:studentid", auth, async (req, res, next) => {
 
     const resp = await bkash_model.find({
       $and: [
@@ -8062,7 +8128,7 @@ router.get(
 
 
 
-router.post('/permissionstudent', async (req, res, next) => {
+router.post('/permissionstudent', auth, async (req, res, next) => {
   console.log(req.body);
 
   const resp = await student_exam.find({
@@ -8104,7 +8170,7 @@ router.post('/permissionstudent', async (req, res, next) => {
 
 })
 
-router.post('/teachmarketingwritting', async (req, res, next) => {
+router.post('/teachmarketingwritting', auth, async (req, res, next) => {
 
   try {
     answer.findByIdAndUpdate({ _id: req.body.autoincrement },
@@ -8136,7 +8202,7 @@ router.post('/teachmarketingwritting', async (req, res, next) => {
 })
 
 router.get(
-  "/viewquestionid/:studentid", async (req, res, next) => {
+  "/viewquestionid/:studentid", auth, async (req, res, next) => {
 
     const resp = await answer.find({
       $and: [
@@ -8267,7 +8333,7 @@ const bkaash_headers = {
   'password': environment.password,
 }
 
-router.get('/getExamTypes', (req, res) => {
+router.get('/getExamTypes', auth, (req, res) => {
   exam_categories.find({status:1})
     .exec()
     .then((resp) => {
@@ -8278,7 +8344,7 @@ router.get('/getExamTypes', (req, res) => {
     });
 })
 
-router.post('/addexamtype', (req,res)=> {
+router.post('/addexamtype', auth, (req,res)=> {
   const user = new exam_categories({
     id: req.body.title,
     title: req.body.title,
@@ -8294,7 +8360,7 @@ router.post('/addexamtype', (req,res)=> {
       });
   })
 })
-router.delete('/deleteExamType/:id', (req, res) => {
+router.delete('/deleteExamType/:id',auth,  (req, res) => {
   exam_categories.remove({ _id: req.params.id }, function (err) {
     if (err) {
       res.send(err);
@@ -8362,7 +8428,7 @@ async function getToken() {
   }
 }
 
-router.get("/getRefreshToken", async function (req, res) {
+router.get("/getRefreshToken", auth, async function (req, res) {
   const endpoint = '/token/refresh';
   const url = environment.base_url + endpoint;
 
@@ -8388,7 +8454,7 @@ router.get("/getRefreshToken", async function (req, res) {
 
 });
 
-router.post("/createPayment", async function (req, res) {
+router.post("/createPayment", auth, async function (req, res) {
   const newToken = await getToken();
   const endpoint = '/create';
   const url = environment.base_url + endpoint;
@@ -8434,7 +8500,7 @@ router.post("/createPayment", async function (req, res) {
   }
 });
 
-router.post("/executePayment", async function (req, res) {
+router.post("/executePayment", auth, async function (req, res) {
   const endpoint = '/execute';
   const url = environment.base_url + endpoint;
   const xAppKey = environment.app_key
@@ -8461,7 +8527,7 @@ router.post("/executePayment", async function (req, res) {
   });
 });
 
-router.post("/queryPayment", async function (req, res) {
+router.post("/queryPayment", auth, async function (req, res) {
   const endpoint = '/payment/status';
   const url = environment.base_url + endpoint;
   const xAppKey = environment.app_key
@@ -8488,7 +8554,7 @@ router.post("/queryPayment", async function (req, res) {
   });
 });
 
-router.post("/refund", async function (req, res) {
+router.post("/refund", auth, async function (req, res) {
   const endpoint = '/payment/refund';
   const url = environment.base_url + endpoint;
   const bkashObj = await bkashtokens.findOne({ type: 'bkash' }).exec()
@@ -8519,7 +8585,7 @@ router.post("/refund", async function (req, res) {
   });
 });
 
-router.post("/refundStatus", async function (req, res) {
+router.post("/refundStatus", auth, async function (req, res) {
   const endpoint = '/payment/refund';
   const url = environment.base_url + endpoint;
   const bkashObj = await bkashtokens.findOne({ type: 'bkash' }).exec()
